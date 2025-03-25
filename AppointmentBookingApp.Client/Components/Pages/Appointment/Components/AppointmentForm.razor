@@ -1,0 +1,206 @@
+﻿@using AppointmentBookingApp.Application.Appointments.Commands
+@using AppointmentBookingApp.Application.Appointments.DTOs
+@using AppointmentBookingApp.Application.Professionals.DTOs;
+@using AppointmentBookingApp.Client.Services
+@using AppointmentBookingApp.Client.Providers
+
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject AppointmentService AppointmentService
+@inject AuthStateProvider AuthStateProvider
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="mt-5">
+    <MudCard>
+        <MudCardContent>
+            <MudText Class="mb-3" Typo="Typo.h4">@(IsEditMode ? "Edit Appointment" : "Create Appointment")</MudText>
+
+            @if (string.IsNullOrEmpty(SelectedSpecialization) || Model.ProfessionalId == 0)
+            {
+                <MudAlert Severity="Severity.Info">
+                    Please select a specialization and a professional before picking a time slot.
+                </MudAlert>
+            }
+
+            <MudForm Model="Model" @ref="form" @bind-IsValid="@success" @bind-Errors="@errors" Class="mt-4">
+                <MudGrid Spacing="8">
+
+                    <MudItem xs="6">
+                        <MudSelect T="string" Label="Specialization" Required="true" ValueChanged="HandleSpecializationChange">
+                            <MudSelectItem T="string" Value="@("Doctor")">Doctor</MudSelectItem>
+                            <MudSelectItem T="string" Value="@("Consultant")">Consultant</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+                    
+                    <MudItem xs="6">
+                        <MudSelect T="int" Label="Professional" 
+                            @bind-Value="Model.ProfessionalId" 
+                            Required="true" 
+                            PopoverClass="select-popover"
+                            Disabled="@string.IsNullOrEmpty(SelectedSpecialization)"
+                            Style="z-index: 9999 !important">
+
+                            <MudSelectItem T="int" Value="0" Disabled>Select a Professional</MudSelectItem>
+                            @foreach (var professional in Professionals)
+                            {
+                                <MudSelectItem T="int" Value="@professional.Id">@($"{professional.Name}")</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="6">
+                        <MudTextField Label="Appointment Date"
+                                      @bind-Value="Model.AppointmentDate"
+                                      For="@(() => Model.AppointmentDate)"
+                                      Required="true"
+                                      RequiredError="Appointment Date is required!"
+                                      ReadOnly="true"
+                                      Type="datetime-local" />
+                    </MudItem>
+
+                    <MudItem xs="6">
+                        <MudTextField Label="Appointment Time"
+                                      @bind-Value="selectedTimeSlotString"
+                                      ReadOnly="true" />
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        @* <MudTextField Label="Selected Time Slot"
+                                      @bind-Value="SelectedTimeSlot"
+                                      ReadOnly="true" /> *@
+                                       
+                        <MudButton Variant="Variant.Outlined" Color="Color.Primary" Disabled="@(Model.ProfessionalId == 0)" OnClick="OpenTimeSlotPicker">
+                            Pick Time Slot
+                        </MudButton>
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudSelect T="string" Label="Status" @bind-Value="Model.Status" Required="true" ReadOnly="@(!IsEditMode)">
+                            <MudSelectItem Value="@("Pending")">Pending</MudSelectItem>
+                            <MudSelectItem Value="@("Accepted")">Accepted</MudSelectItem>
+                            <MudSelectItem Value="@("Rejected")">Rejected</MudSelectItem>
+                            <MudSelectItem Value="@("Cancel")">Cancel</MudSelectItem>
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudButton Type="Submit" Variant="Variant.Filled" Color="Color.Primary" Class="mt-3 w-100"
+                                   Disabled="@isSubmitting" OnClick="HandleAppointment">
+                            @(isSubmitting ? "Submitting Appointment..." : (IsEditMode ? "Update Appointment" : "Create Appointment"))
+                        </MudButton>
+                    </MudItem>
+                </MudGrid>
+            </MudForm>
+        </MudCardContent>
+    </MudCard>
+</MudContainer>
+
+@code {
+    [Parameter] public AddEditAppointmentCommand Model { get; set; } = new AddEditAppointmentCommand();
+    [Parameter] public bool IsEditMode { get; set; } = false;
+    [Parameter] public EventCallback<bool> OnSubmitSuccess { get; set; }
+
+    [Inject] private ProfessionalService ProfessionalService { get; set; }
+
+    private List<ProfessionalDto> Professionals = new();
+
+    private string SelectedSpecialization;
+    private string selectedTimeSlotString;
+
+    // private MudDialogInstance MudDialog;
+    private string SelectedTimeSlot;
+
+    private MudForm form;
+    private bool success;
+    private string[] errors = { };
+    private bool isSubmitting = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        
+        if (Model.AppointmentDate == default)
+        {
+            Model.AppointmentDate = DateTime.Today;
+        }
+
+        if (!IsEditMode)
+        {
+            Model.UserId = await AuthStateProvider.GetUserIdAsync();
+            Model.Status = "Pending";
+        }
+    }
+
+    private async Task HandleSpecializationChange(string specialization)
+    {
+        if (!string.IsNullOrEmpty(specialization))
+        {
+            SelectedSpecialization = specialization;
+            Professionals = await ProfessionalService.GetProfessionalsBySpecialization(specialization);
+        }
+    }
+
+    private async Task OpenTimeSlotPicker()
+    {
+        var options = new DialogOptions { CloseButton = true, CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+
+        var parameters = new DialogParameters
+    {
+        { "DialogTitle", "Select Time Slot" },
+        { "ProfessionalId", Model.ProfessionalId },
+        { "OnTimeSelected", EventCallback.Factory.Create<string>(this, HandleTimeSelection) }
+    };
+
+        var dialog = await DialogService.ShowAsync<TimeSlotPicker>("Select Time Slot", parameters, options);
+        var result = await dialog.Result;
+
+        if (!result.Canceled && result.Data is not null)
+        {
+            var selectedData = (dynamic)result.Data;
+            int selectedSlotId = selectedData.SlotId;
+            string timeRange = selectedData.TimeRange;
+            DateTime appointmentDate = selectedData.AppointmentDate;
+            Model.AppointmentDate = appointmentDate;
+            Model.ProfessionalAvailabilityId = selectedSlotId;
+            selectedTimeSlotString = timeRange;
+
+            StateHasChanged();
+            Snackbar.Add($"Appointment Time Updated: {appointmentDate:MMM dd, yyyy} at {timeRange}", Severity.Info);
+        }
+    }
+
+
+
+    private void HandleTimeSelection(string timeSlot)
+    {
+        SelectedTimeSlot = timeSlot;
+    }
+
+    private async Task HandleAppointment()
+    {
+        await form.Validate();
+        if (!success) return;
+
+        if (Model.UserId == null)
+        {
+            Snackbar.Add("User details not found.Please Login again or Contact Admin", Severity.Error);
+            return;
+        }
+
+        isSubmitting = true;
+
+        var response = IsEditMode
+            ? await AppointmentService.UpdateAppointment(Model)
+            : await AppointmentService.CreateAppointment(Model);
+
+        if (response.IsSuccess)
+        {
+            Snackbar.Add(response.Message, Severity.Success);
+            await OnSubmitSuccess.InvokeAsync(true);
+        }
+        else
+        {
+            Snackbar.Add(response.Message, Severity.Error);
+        }
+
+        isSubmitting = false;
+    }
+}

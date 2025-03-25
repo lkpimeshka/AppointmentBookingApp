@@ -1,0 +1,95 @@
+﻿@page "/login"
+
+@using AppointmentBookingApp.Application.Auth.DTOs
+@using AppointmentBookingApp.Application.Auth
+@using AppointmentBookingApp.Client.Providers
+@using System.ComponentModel.DataAnnotations
+@using static MudBlazor.Icons.Material
+
+@inject AuthStateProvider AuthStateProvider
+@inject IAuthService AuthService
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+
+<PageTitle>Log in</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="mt-5">
+    <MudCard>
+        <MudCardContent>
+            <MudText Class="mb-3" Typo="Typo.h4">Login</MudText>
+
+            <MudForm Model="loginDto" @ref="form" @bind-IsValid="@success" @bind-Errors="@errors">
+                <MudGrid Spacing="8">
+                    <MudItem xs="12">
+                        <MudTextField Label="UserName"
+                                      @bind-Value="loginDto.UserName"
+                                      For="@(() => loginDto.UserName)"
+                                      Required="true"
+                                      RequiredError="UserName is required!"
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.Person" />
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudTextField Label="Password"
+                                      @bind-Value="loginDto.Password"
+                                      For="@(() => loginDto.Password)"
+                                      Required="true"
+                                      RequiredError="Password is required!"
+                                      Type="password"
+                                      Adornment="Adornment.Start"
+                                      AdornmentIcon="@Icons.Material.Filled.Lock" />
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudButton Type="Submit" Variant="Variant.Filled" Color="Color.Primary" Class="mt-3 w-100"
+                                   Disabled="@isSubmitting" OnClick="HandleLogin">
+                            @(isSubmitting ? "Logging in..." : "Log in")
+                        </MudButton>
+                    </MudItem>
+                </MudGrid>
+            </MudForm>
+        </MudCardContent>
+    </MudCard>
+</MudContainer>
+
+@code {
+    private MudForm form;
+    private bool success;
+    private string[] errors = { };
+    private LoginDto loginDto = new LoginDto();
+    private bool isSubmitting = false;
+
+    private async Task HandleLogin()
+    {
+        await form.Validate();
+
+        if (!success)
+        {
+            // Snackbar.Add("Invalid Data", Severity.Error);
+            return; 
+        }
+
+        isSubmitting = true;
+        
+        var jwtResponse = await AuthService.Login(loginDto);
+
+        if (jwtResponse != null && !string.IsNullOrEmpty(jwtResponse.Token))
+        {
+
+            await AuthStateProvider.SetToken(jwtResponse.Token);
+            Snackbar.Add("Login Successful", Severity.Success);
+            NavigationManager.NavigateTo("/");
+        }
+        else
+        {   
+            errors = new string[] { "Invalid username or password." };
+            foreach (var error in errors)
+            {
+                Snackbar.Add(error, Severity.Error);
+            }
+        }
+
+        isSubmitting = false;
+    }
+}

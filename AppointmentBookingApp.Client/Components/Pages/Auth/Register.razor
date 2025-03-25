@@ -1,0 +1,180 @@
+﻿@page "/register"
+
+@using AppointmentBookingApp.Application.Auth.DTOs
+@using AppointmentBookingApp.Application.Auth
+@using System.ComponentModel.DataAnnotations
+
+@inject IAuthService AuthService
+@inject NavigationManager NavigationManager
+@inject ISnackbar Snackbar
+@inject HttpClient HttpClient
+
+<PageTitle>Register</PageTitle>
+
+<style>
+    .dropdown-on-top .mud-select-menu {
+        z-index: 9999 !important;
+    }
+</style>
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="mt-5">
+    <MudCard>
+        <MudCardContent>
+            <MudText Class="mb-3" Typo="Typo.h4">Register</MudText>
+
+            <MudForm Model="registerDto" @ref="form" @bind-IsValid="@isValidForm" @bind-Errors="@errors">
+                <MudGrid Spacing="8">
+                    <MudItem xs="8">
+                        <MudTextField Label="Username"
+                                      @bind-Value="registerDto.UserName"
+                                      For="@(() => registerDto.UserName)"
+                                      Required="true"
+                                      RequiredError="Username is required!" />
+                    </MudItem>
+
+                    <MudItem xs="4">
+                        <MudSelect T="string" Label="Role" Required="true" Class="dropdown-on-top" ValueChanged="HandleRoleChange">
+                            @foreach (var role in roles.Where(r => r != "Admin"))
+                            {
+                                <MudSelectItem T="string" Value="@role">@role</MudSelectItem>
+                            }
+                        </MudSelect>
+                    </MudItem>
+
+                    <MudItem xs="8">
+                        <MudTextField Label="Full Name"
+                                      @bind-Value="registerDto.FullName"
+                                      For="@(() => registerDto.FullName)"
+                                      Required="true"
+                                      RequiredError="Full Name is required!" />
+                    </MudItem>
+
+                    @if (isProfessional)
+                    {
+                        <MudItem xs="8">
+                            <MudTextField Label="Phone Number"
+                                          @bind-Value="registerDto.PhoneNumber"
+                                          For="@(() => registerDto.PhoneNumber)"
+                                          Required="true"
+                                          RequiredError="Phone Number is required!" />
+                        </MudItem>
+
+                        <MudItem xs="4">
+                            <MudSelect T="string" Label="Specialization" @bind-Value="registerDto.Specialization" Required="true">
+                                <MudSelectItem T="string" Value="@("Doctor")">Doctor</MudSelectItem>
+                                <MudSelectItem T="string" Value="@("Consultant")">Consultant</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+                    }
+
+                    <MudItem xs="8">
+                        <MudTextField Label="Email"
+                                      @bind-Value="registerDto.Email"
+                                      For="@(() => registerDto.Email)"
+                                      Required="true"
+                                      RequiredError="Email is required!" />
+                    </MudItem>
+
+                    <MudItem xs="6">
+                        <MudTextField Label="Password"
+                                      @bind-Value="registerDto.Password"
+                                      For="@(() => registerDto.Password)"
+                                      Required="true"
+                                      RequiredError="Password is required!"
+                                      Type="password" />
+                    </MudItem>
+
+                    <MudItem xs="6">
+                        <MudTextField Label="Confirm Password"
+                                      @bind-Value="confirmPassword"
+                                      For="@(() => confirmPassword)"
+                                      Required="true"
+                                      RequiredError="Confirm Password is required!"
+                                      Type="password" />
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudButton Type="Submit" Variant="Variant.Filled" Color="Color.Primary" Class="mt-3 w-100" OnClick="HandleRegister" Disabled="@isSubmitting">
+                            @(isSubmitting ? "Registering..." : "Register")
+                        </MudButton>
+                    </MudItem>
+                </MudGrid>
+            </MudForm>
+        </MudCardContent>
+    </MudCard>
+</MudContainer>
+
+@code {
+    private MudForm form;
+    private RegisterDto registerDto = new RegisterDto();
+    private string confirmPassword = string.Empty;
+    private bool isSubmitting = false;
+    private bool isValidForm = false;
+    private string[] errors = { };
+    private List<string> roles = new List<string>();
+    private bool isProfessional = false; // Track if user selected Professional role
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadRolesAsync();
+    }
+
+    private async Task LoadRolesAsync()
+    {
+        try
+        {
+            var fetchedRoles = await HttpClient.GetFromJsonAsync<List<string>>("api/auth/roles");
+            if (fetchedRoles != null)
+            {
+                roles = fetchedRoles;
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error fetching roles: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private void HandleRoleChange(string role)
+    {
+        registerDto.Role = role;
+        isProfessional = (registerDto.Role == "Professional") ? true : false;
+        if (!isProfessional)
+        {
+            registerDto.Specialization = " ";
+            registerDto.PhoneNumber = " ";
+        }
+    }
+
+    private async Task HandleRegister()
+    {
+        await form.Validate();
+
+        if (!isValidForm)
+        {
+            return;
+        }
+
+        if (registerDto.Password != confirmPassword)
+        {
+            Snackbar.Add("Passwords do not match", Severity.Error);
+            return;
+        }
+
+        isSubmitting = true;
+
+        var response = await AuthService.Register(registerDto);
+
+        if (response != null && response.IsSuccess)
+        {
+            Snackbar.Add(response.Message, Severity.Success);
+            NavigationManager.NavigateTo("/login");
+        }
+        else
+        {
+            Snackbar.Add(response?.Message ?? "An error occurred during registration.", Severity.Error);
+        }
+
+        isSubmitting = false;
+    }
+}

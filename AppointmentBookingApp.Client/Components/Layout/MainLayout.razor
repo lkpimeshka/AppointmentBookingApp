@@ -1,0 +1,114 @@
+﻿@inherits LayoutComponentBase
+@using AppointmentBookingApp.Client.Components.Shared
+@using AppointmentBookingApp.Client.Providers
+@using Microsoft.AspNetCore.Components.Authorization
+
+@inject AuthStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+@inject IDialogService DialogService
+
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+ <div class="page">
+    <div class="sidebar">
+        <NavMenu />
+    </div>
+
+    <main>
+        <div class="top-row px-4">
+            <AuthorizeView>
+                <Authorized>
+                    <MudButton @onclick="ShowLogoutDialog" Variant="Variant.Outlined" Color="Color.Primary">
+                        Logout
+                    </MudButton>
+                </Authorized>
+                <NotAuthorized>
+                    <a href="register">Register</a>
+                    <a href="login">Login</a>
+                </NotAuthorized>
+            </AuthorizeView>
+         </div>
+
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+</div>
+
+@code {
+
+    private async Task ShowLogoutDialog()
+    {
+        var options = new DialogOptions { CloseOnEscapeKey = true, MaxWidth = MaxWidth.Small, FullWidth = true };
+
+        var parameters = new DialogParameters
+    {
+        { "Title", "Confirm Logout" },
+        { "Message", "Are you sure you want to log out?" }
+    };
+
+        var dialog = DialogService.Show<ConfirmDialog>("Confirmation", parameters, options);
+
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            await AuthStateProvider.Logout();
+            Navigation.NavigateTo("login", forceLoad: true);
+        }
+    }
+
+}
+
+@* @inherits LayoutComponentBase
+@inject AuthenticationStateProvider AuthStateProvider
+@using Microsoft.AspNetCore.Components.Authorization
+
+<div class="page">
+    <div class="sidebar">
+        <NavMenu />
+    </div>
+
+    <main>
+        <CascadingAuthenticationState>
+            <AuthorizeView>
+                <Authorized>
+                    <a href="logout" >Logout</a>
+                </Authorized>
+                <NotAuthorized>
+                    <a href="register">Register</a>
+                    <a href="login">Login</a>
+                </NotAuthorized>
+            </AuthorizeView>
+        </CascadingAuthenticationState>
+
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+</div>
+
+@code {
+    private AuthenticationState _authenticationState;
+    private Task<AuthenticationState> _authenticationStateTask;
+
+    protected override async Task OnInitializedAsync()
+    {
+        
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _authenticationStateTask = AuthStateProvider.GetAuthenticationStateAsync();
+            _authenticationState = await _authenticationStateTask;
+            StateHasChanged();
+        }
+    }
+} *@
+
+
+

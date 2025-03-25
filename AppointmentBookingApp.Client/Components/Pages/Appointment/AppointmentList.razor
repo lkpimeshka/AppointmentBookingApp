@@ -1,0 +1,206 @@
+﻿@page "/appointment-list"
+@using AppointmentBookingApp.Application.Appointments.Commands
+@using AppointmentBookingApp.Application.Appointments.DTOs
+@using AppointmentBookingApp.Client.Services
+@using AppointmentBookingApp.Client.Providers
+@using AppointmentBookingApp.Client.Components.Pages.Auth;
+
+@inject AppointmentService AppointmentService
+@inject AuthStateProvider AuthStateProvider
+@inject ISnackbar Snackbar
+@inject NavigationManager NavigationManager
+
+<AuthorizeView>
+    <NotAuthorized>
+        <Login/>
+    </NotAuthorized>
+</AuthorizeView>
+
+<MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="NavigateToCreateAppointment" Class="mb-5">
+    Create Appointment
+</MudButton>
+
+<MudDataGrid T="AppointmentViewModel" Items="@Appointments" SortMode="SortMode.Multiple" Filterable="false" QuickFilter="@_quickFilter"
+             Hideable="false">
+    <ToolBarContent>
+        <MudText Typo="Typo.h6">Appointments</MudText>
+        <MudSpacer />
+        <MudTextField @bind-Value="_searchString" Placeholder="Search" Adornment="Adornment.Start" Immediate="true"
+                      AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+    </ToolBarContent>
+    <Columns>
+        <PropertyColumn Property="x => x.Id" Title="ID" />
+        <PropertyColumn Property="x => x.UserName" Title="User Name" />
+        <PropertyColumn Property="x => x.ProfessionalName" Title="Professional" />
+        <PropertyColumn Property="x => x.AppointmentDate" Title="Date" Format="yyyy-MM-dd" />
+        <PropertyColumn Property="x => x.FormattedStartTime" Title="Start Time" />
+        <PropertyColumn Property="x => x.FormattedEndTime" Title="End Time" />
+        <PropertyColumn Property="x => x.Status" Title="Status" />
+
+        <TemplateColumn CellStyle="width:60px" Title="Actions" Sortable="false">
+            <CellTemplate>
+                <MudMenu Icon="@Icons.Material.Filled.Edit" Variant="Variant.Filled" DisableElevation="true" Size="Size.Small"
+                             Dense="true"
+                             EndIcon="@Icons.Material.Filled.KeyboardArrowDown" IconColor="Color.Info" AnchorOrigin="Origin.CenterLeft">
+                @if (userRole == "Admin")
+                {
+                    @if (context.Item.Status == "Pending")
+                    {
+                        <MudMenuItem Disabled="@IsAppointmentPastOrToday(context.Item)" OnClick="@(() => OnEdit(context.Item))">Edit</MudMenuItem>
+                    }
+                }
+                else if (userRole == "Professional")
+                {
+                    @if (context.Item.Status == "Pending")
+                    {
+                        <MudMenuItem Disabled="@IsAppointmentPastOrToday(context.Item)" OnClick="@(() => OnEdit(context.Item))">Edit</MudMenuItem>
+                        <MudMenuItem OnClick=@(()=>OnAccept(context.Item))>Set Accepted</MudMenuItem>
+                        <MudMenuItem OnClick=@(()=>OnReject(context.Item))>Set Rejected</MudMenuItem>
+                    }
+                    else if (context.Item.Status == "Accepted")
+                    {
+                        <MudMenuItem OnClick=@(()=>OnReject(context.Item))>Set Rejected</MudMenuItem>
+                    }
+                }
+                else
+                {
+                    @if (context.Item.Status == "Pending")
+                    {
+                        <MudMenuItem Disabled="@IsAppointmentPastOrToday(context.Item)" OnClick="@(() => OnEdit(context.Item))">Edit</MudMenuItem>
+                        <MudMenuItem OnClick=@(()=>OnCancel(context.Item))>Set Cancel</MudMenuItem>
+                    }
+                }
+                </MudMenu>
+            </CellTemplate>
+        </TemplateColumn>
+    </Columns>
+    <PagerContent>
+        <MudDataGridPager T="AppointmentViewModel" />
+    </PagerContent>
+</MudDataGrid>
+
+@code {
+    // private List<AppointmentListDto> Appointments = new();
+    private string? _searchString;
+    private string? userRole;
+
+    public class AppointmentViewModel
+    {
+        public int Id { get; set; }
+        public string? UserName { get; set; }
+        public string? ProfessionalName { get; set; }
+        public DateTime AppointmentDate { get; set; }
+        public TimeSpan StartTime { get; set; }
+        public TimeSpan EndTime { get; set; }
+        public string? Status { get; set; }
+        public string? FormattedStartTime { get; set; }
+        public string? FormattedEndTime { get; set; }
+    }
+
+    private List<AppointmentViewModel> Appointments = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUserRole();
+        await LoadAppointments();
+    }
+
+    private async Task LoadUserRole()
+    {
+        try
+        {
+            userRole = await AuthStateProvider.GetUserRoleAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching user role: {ex.Message}");
+        }
+    }
+
+    private async Task LoadAppointments()
+    {
+        try
+        {
+            var userId = await AuthStateProvider.GetUserIdAsync();
+            var rawAppointments = await AppointmentService.GetAllAppointments(userId, userRole);
+
+            Appointments = rawAppointments.Select(a => new AppointmentViewModel
+                {
+                    Id = a.Id,
+                    UserName = a.UserName,
+                    ProfessionalName = a.ProfessionalName,
+                    AppointmentDate = a.AppointmentDate,
+                    StartTime = a.StartTime,
+                    EndTime = a.EndTime,
+                    Status = a.Status,
+                    FormattedStartTime = DateTime.Today.Add(a.StartTime).ToString("hh:mm tt"),
+                    FormattedEndTime = DateTime.Today.Add(a.EndTime).ToString("hh:mm tt")
+                })
+                .OrderByDescending(a => a.Id)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching appointments: {ex.Message}");
+        }
+    }
+
+    private void NavigateToCreateAppointment()
+    {
+        NavigationManager.NavigateTo("/create-appointment");
+    }
+
+    private bool IsAppointmentPastOrToday(AppointmentViewModel appointment)
+    {
+        return appointment.AppointmentDate.Date <= DateTime.Today;
+    }
+
+    private async Task OnEdit(AppointmentViewModel appointment)
+    {
+        // Snackbar.Add($"Edit item ID: {appointment.Id}", Severity.Info);
+        NavigationManager.NavigateTo($"/edit-appointment/{appointment.Id}");
+    }
+
+    private async Task UpdateAppointmentStatus(AppointmentViewModel appointment, string status)
+    {
+        AppointmentDto appointmentDto = await AppointmentService.GetAppointmentById(appointment.Id);
+        var command = new AddEditAppointmentCommand
+            {
+                Id = appointment.Id,
+                UserId = appointmentDto.UserId,
+                ProfessionalId = appointmentDto.ProfessionalId,
+                AppointmentDate = appointmentDto.AppointmentDate,
+                ProfessionalAvailabilityId = appointmentDto.ProfessionalAvailabilityId,
+                Status = status
+            };
+
+        var response = await AppointmentService.UpdateAppointment(command);
+
+        if (response.IsSuccess)
+        {
+            Snackbar.Add("Appointment updated successfully.", Severity.Success);
+            await LoadAppointments();
+        }
+        else
+        {
+            Snackbar.Add($"Failed to update appointment: {response.Message}", Severity.Error);
+        }
+    }
+
+    private async Task OnAccept(AppointmentViewModel appointment) => await UpdateAppointmentStatus(appointment, "Accepted");
+
+    private async Task OnReject(AppointmentViewModel appointment) => await UpdateAppointmentStatus(appointment, "Rejected");
+
+    private async Task OnCancel(AppointmentViewModel appointment) => await UpdateAppointmentStatus(appointment, "Cancel");
+
+
+    private Func<AppointmentViewModel, bool> _quickFilter => x =>
+    {
+        if (string.IsNullOrWhiteSpace(_searchString))
+            return true;
+
+        return x.UserName.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+               x.ProfessionalName.Contains(_searchString, StringComparison.OrdinalIgnoreCase) ||
+               x.Status.Contains(_searchString, StringComparison.OrdinalIgnoreCase);
+    };
+}

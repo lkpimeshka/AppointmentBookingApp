@@ -1,0 +1,31 @@
+﻿@page "/manage-timeslot"
+@using AppointmentBookingApp.Application.Professionals.Commands
+@using AppointmentBookingApp.Client.Components.Pages.Professional.Components
+
+@inject NavigationManager NavigationManager
+
+<PageTitle>Available Time Slot</PageTitle>
+
+<AuthorizeView Roles="Professional">
+    <Authorized>
+        <AvailabilityForm Model="new AddEditAvailabilityCommand()"
+                          IsEditMode="false"
+                          OnSubmitSuccess="HandleSuccess" />
+    </Authorized>
+    <NotAuthorized>
+        <MudAlert Severity="Severity.Error">
+            You are not authorized to view this page. Only Professionals can access this page.
+        </MudAlert>
+    </NotAuthorized>
+</AuthorizeView>
+
+
+@code {
+    private void HandleSuccess(bool success)
+    {
+        if (success)
+        {
+            NavigationManager.NavigateTo("/timeslot-list");
+        }
+    }
+}

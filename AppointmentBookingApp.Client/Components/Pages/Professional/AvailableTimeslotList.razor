@@ -1,0 +1,114 @@
+﻿@page "/timeslot-list"
+@using AppointmentBookingApp.Application.Appointments.Commands
+@using AppointmentBookingApp.Application.Appointments.DTOs
+@using AppointmentBookingApp.Application.Professionals.DTOs
+@using AppointmentBookingApp.Client.Services
+@using AppointmentBookingApp.Client.Providers
+@using AppointmentBookingApp.Client.Components.Pages.Auth;
+
+@inject AppointmentService AppointmentService
+@inject ProfessionalService ProfessionalService
+@inject AuthStateProvider AuthStateProvider
+@inject ISnackbar Snackbar
+@inject NavigationManager NavigationManager
+
+<AuthorizeView Roles="Professional">
+    <NotAuthorized>
+        <MudAlert Severity="Severity.Error">
+            You are not authorized to view this page. Only Professionals can access this page.
+        </MudAlert>
+    </NotAuthorized>
+    <Authorized>
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="NavigateToCreateTimeSlot" Class="mb-5">
+            Create TimeSlot
+        </MudButton>
+
+        <MudDataGrid T="TimeslotAvailabilityModel" Items="@TimeSlots" SortMode="SortMode.Multiple" Filterable="false" QuickFilter="@_quickFilter"
+                     Hideable="false">
+            <ToolBarContent>
+                <MudText Typo="Typo.h6">Timeslot Availability</MudText>
+                <MudSpacer />
+                <MudTextField @bind-Value="_searchString" Placeholder="Search" Adornment="Adornment.Start" Immediate="true"
+                              AdornmentIcon="@Icons.Material.Filled.Search" IconSize="Size.Medium" Class="mt-0"></MudTextField>
+            </ToolBarContent>
+            <Columns>
+                <PropertyColumn Property="x => x.Id" Title="ID" />
+                <PropertyColumn Property="x => x.AppointmentDate" Title="Date" Format="yyyy-MM-dd" />
+                <PropertyColumn Property="x => x.FormattedStartTime" Title="Start Time" />
+                <PropertyColumn Property="x => x.FormattedEndTime" Title="End Time" />
+                <PropertyColumn Property="x => x.Status" Title="Status" />
+            </Columns>
+            <PagerContent>
+                <MudDataGridPager T="TimeslotAvailabilityModel" />
+            </PagerContent>
+        </MudDataGrid>
+    </Authorized>
+</AuthorizeView>
+
+
+
+@code {
+
+    private string? _searchString;
+    private string? userRole;
+    private ProfessionalDto professionalDto;
+
+    public class TimeslotAvailabilityModel
+    {
+        public int Id { get; set; }
+        public DateTime AppointmentDate { get; set; }
+        public TimeSpan StartTime { get; set; }
+        public TimeSpan EndTime { get; set; }
+        public string? Status { get; set; }
+        public string? FormattedStartTime { get; set; }
+        public string? FormattedEndTime { get; set; }
+    }
+
+    private List<TimeslotAvailabilityModel> TimeSlots = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAppointments();
+    }
+
+    private async Task LoadAppointments()
+    {
+        try
+        {
+            var userId = await AuthStateProvider.GetUserIdAsync();
+            professionalDto = await ProfessionalService.GetByUserId(userId);
+            var availableSlots = await ProfessionalService.GetAvailableTimeSlotsByProfessionalIdAllTime(professionalDto.Id);
+
+            TimeSlots = availableSlots.Select(a => new TimeslotAvailabilityModel
+                {
+                    Id = a.Id,
+                    AppointmentDate = a.AvailableDate,
+                    StartTime = a.StartTime,
+                    EndTime = a.EndTime,
+                    Status = (a.IsBooked)? "Booked" : "Not Booked",
+                    FormattedStartTime = DateTime.Today.Add(a.StartTime).ToString("hh:mm tt"),
+                    FormattedEndTime = DateTime.Today.Add(a.EndTime).ToString("hh:mm tt")
+                })
+                .OrderByDescending(a => a.AppointmentDate)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error fetching appointments: {ex.Message}");
+        }
+    }
+
+    private void NavigateToCreateTimeSlot()
+    {
+        NavigationManager.NavigateTo("/manage-timeslot");
+    }
+
+    
+    private Func<TimeslotAvailabilityModel, bool> _quickFilter => x =>
+    {
+        if (string.IsNullOrWhiteSpace(_searchString))
+            return true;
+
+        return x.Status.Contains(_searchString, StringComparison.OrdinalIgnoreCase);
+    };
+}

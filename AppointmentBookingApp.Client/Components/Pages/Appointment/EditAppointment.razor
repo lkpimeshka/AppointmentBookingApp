@@ -1,0 +1,63 @@
+﻿@page "/edit-appointment/{id:int}"
+@using AppointmentBookingApp.Application.Appointments.Commands
+@using AppointmentBookingApp.Application.Appointments.DTOs
+@using AppointmentBookingApp.Client.Components.Pages.Appointment.Components
+@using AppointmentBookingApp.Client.Services
+@using AppointmentBookingApp.Client.Components.Pages.Auth;
+
+@inject AppointmentService AppointmentService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Edit Appointment</PageTitle>
+
+<AuthorizeView>
+    <NotAuthorized>
+        <Login/>
+    </NotAuthorized>
+    <Authorized>
+        @if (Model != null)
+        {
+            <AppointmentForm Model="Model"
+                             IsEditMode="true"
+                             OnSubmitSuccess="HandleSuccess" />
+        }
+        else
+        {
+            <MudText Typo="Typo.h5" Color="Color.Error">Loading...</MudText>
+        }
+    </Authorized>
+</AuthorizeView>
+
+
+
+@code {
+    [Parameter] public int Id { get; set; }
+    private AddEditAppointmentCommand Model { get; set; }
+    private AppointmentDto appointmentDto;
+
+    protected override async Task OnInitializedAsync()
+    {
+        appointmentDto = await AppointmentService.GetAppointmentById(Id);
+
+        if (appointmentDto != null)
+        {
+            Model = new AddEditAppointmentCommand
+                {
+                    Id = appointmentDto.Id,
+                    UserId = appointmentDto.UserId,
+                    ProfessionalId = appointmentDto.ProfessionalId,
+                    AppointmentDate = appointmentDto.AppointmentDate,
+                    ProfessionalAvailabilityId = appointmentDto.ProfessionalAvailabilityId,
+                    Status = appointmentDto.Status
+                };
+        }
+    }
+
+    private void HandleSuccess(bool success)
+    {
+        if (success)
+        {
+            NavigationManager.NavigateTo("/appointments");
+        }
+    }
+}

@@ -1,0 +1,116 @@
+﻿@page "/"
+
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IJSRuntime JSRuntime
+@inject ProtectedSessionStorage _protectedSessionStorage
+@inject ISnackbar Snackbar
+
+
+
+<PageTitle>Home</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="mt-6">
+    <!-- Banner Section -->
+    <MudPaper Class="pa-6 text-center" Elevation="3" Style="background-color: #1976D2; color: white;">
+        <MudText Class="mb-3" Typo="Typo.h3">Login
+            Smart Appointment Booking System
+        </MudText>
+    </MudPaper>
+    
+    <!-- Main Content -->
+    <MudPaper Class="pa-6 text-center mt-4" Elevation="3">
+        <MudText Class="mb-2" Typo="Typo.h4">Login
+            Effortless Scheduling for Professionals and Clients
+        </MudText>
+        
+        <MudText Typo="Typo.body1" Class="text-secondary mb-4">
+            Our system allows users to seamlessly book and manage appointments with doctors, consultants,
+            and other service providers. Stay on top of your schedule with ease.
+        </MudText>
+        
+        <MudList Dense T="string">
+            <MudListItem>
+                <MudText>✔ Register and log in securely</MudText>
+            </MudListItem>
+            <MudListItem>
+                <MudText>✔ Book, modify, and cancel appointments hassle-free</MudText>
+            </MudListItem>
+            <MudListItem>
+                <MudText>✔ Professionals can manage their availability effortlessly</MudText>
+            </MudListItem>
+            <MudListItem>
+                <MudText>✔ Admins have full control over users and professionals</MudText>
+            </MudListItem>
+        </MudList>
+
+        <AuthorizeView>
+            <NotAuthorized>
+                <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="NavigateLogin" Class="mt-4">
+                    Login to Get Started
+                </MudButton>
+            </NotAuthorized>
+        </AuthorizeView>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private bool _open;
+    private Anchor _anchor;
+    private bool _overlayAutoClose = true;
+
+    private AuthenticationState _authenticationState;
+    private Task<AuthenticationState> _authenticationStateTask;
+
+    private void OpenDrawer(Anchor anchor)
+    {
+        _open = true;
+        _anchor = anchor;
+    }
+
+    private void NavigateLogin()
+    {
+        NavigationManager.NavigateTo("/login");
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        // _authenticationStateTask = AuthStateProvider.GetAuthenticationStateAsync();
+        // _authenticationStateTask = AuthStateProvider.GetAuthenticationStateAsync();
+
+        // _authenticationState = await AuthStateProvider.GetAuthenticationStateAsync();
+        // if (_authenticationState?.User?.Identity?.IsAuthenticated ?? false)
+        // {
+        //     Snackbar.Add("User is authenticated!", Severity.Success);
+        // }
+        // else
+        // {
+        //     Snackbar.Add("User is not authenticated.", Severity.Error);
+        // }
+        
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            // Safely invoke JavaScript interop after the component has been rendered
+            // await JSRuntime.InvokeVoidAsync("console.log", "Component has been rendered!");
+            // var tokentest = await _protectedSessionStorage.GetAsync<string>("authToken");
+            
+            // _authenticationStateTask = AuthStateProvider.GetAuthenticationStateAsync();
+
+            // _authenticationState = await AuthStateProvider.GetAuthenticationStateAsync();
+            // if (_authenticationState?.User?.Identity?.IsAuthenticated ?? false)
+            // {
+            //     Snackbar.Add("User is authenticated!", Severity.Success);
+            // }
+            // else
+            // {
+            //     Snackbar.Add("User is not authenticated.", Severity.Error);
+            // }
+            // Snackbar.Add(tokentest.Value, Severity.Success);
+            // StateHasChanged();
+        }
+    }
+}

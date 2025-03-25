@@ -1,0 +1,153 @@
+﻿@using AppointmentBookingApp.Application.Appointments.Commands
+@using AppointmentBookingApp.Application.Appointments.DTOs
+@using AppointmentBookingApp.Application.Professionals.Commands
+@using AppointmentBookingApp.Application.Professionals.DTOs
+@using AppointmentBookingApp.Client.Services
+@using AppointmentBookingApp.Client.Providers
+
+
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+@inject AuthStateProvider AuthStateProvider
+@inject ProfessionalService ProfessionalService
+@inject AppointmentService AppointmentService
+
+<MudContainer MaxWidth="MaxWidth.Medium" Class="mt-5">
+    <MudCard>
+        <MudCardContent>
+            <MudText Class="mb-3" Typo="Typo.h4">@(IsEditMode ? "Edit Available Timeslot" : "Create Available Timeslot")</MudText>
+
+            <MudForm Model="Model" @ref="form" @bind-IsValid="@success" Validate="true">
+                <MudGrid Spacing="8">
+
+                    <MudItem xs="6">
+                        <MudDatePicker Label="Appointment Date"
+                                       @bind-Date="_availableDate"
+                                       Required="true"
+                                       RequiredError="Available Date is required!" />
+                    </MudItem>
+
+                    <MudItem xs="6">
+                        <MudTimePicker Label="Start Time"
+                                       AmPm="true"
+                                       @bind-Time="_startTime"
+                                       Required="true"
+                                       RequiredError="Start Time is required!" />
+                    </MudItem>
+
+                    <MudItem xs="6">
+                        <MudTimePicker Label="End Time"
+                                       AmPm="true"
+                                       @bind-Time="_endtime"
+                                       Required="true"
+                                       RequiredError="End Time is required!" />
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudSwitch Label="Is Booked" @bind-Value="_isBooked" Color="Color.Secondary" />
+                    </MudItem>
+
+                    <MudItem xs="12">
+                        <MudButton Type="Submit" Variant="Variant.Filled" Color="Color.Primary" Class="mt-3 w-100"
+                                   Disabled="@isSubmitting" OnClick="HandleAvailability">
+                            @(isSubmitting ? "Submitting..." : (IsEditMode ? "Update Availability" : "Create Availability"))
+                        </MudButton>
+                    </MudItem>
+                </MudGrid>
+            </MudForm>
+        </MudCardContent>
+    </MudCard>
+</MudContainer>
+
+@code {
+    [Parameter] public AddEditAvailabilityCommand Model { get; set; } = default!;
+    [Parameter] public bool IsEditMode { get; set; } = false;
+    [Parameter] public EventCallback<bool> OnSubmitSuccess { get; set; }
+
+    private DateTime? _availableDate;
+    private TimeSpan? _startTime;
+    private TimeSpan? _endtime;
+    private bool _isBooked = false;
+
+    private MudForm form;
+    private bool success;
+    private bool isSubmitting = false;
+
+    private string userId;
+    private ProfessionalDto professionalDto;
+
+    protected override async Task OnInitializedAsync()
+    {
+        userId = await AuthStateProvider.GetUserIdAsync();
+        if (!string.IsNullOrEmpty(userId))
+        {
+            professionalDto = await ProfessionalService.GetByUserId(userId);
+        }
+    }
+
+
+    private async Task HandleAvailability()
+    {
+        Snackbar.Clear();
+
+        if (professionalDto == null || professionalDto.Id <= 0)
+        {
+            Snackbar.Add("Your professional data not found.", Severity.Error);
+            return;
+        }
+
+        if (!_availableDate.HasValue)
+        {
+            Snackbar.Add("Appointment Date is required.", Severity.Error);
+            return;
+        }
+
+        if (!_startTime.HasValue)
+        {
+            Snackbar.Add("Start Time is required.", Severity.Error);
+            return;
+        }
+
+        if (!_endtime.HasValue)
+        {
+            Snackbar.Add("End Time is required.", Severity.Error);
+            return;
+        }
+
+        if (_startTime.HasValue && _endtime.HasValue && _endtime <= _startTime)
+        {
+            Snackbar.Add("End Time must be later than Start Time.", Severity.Error);
+            return;
+        }
+
+
+        await form.Validate();
+        if (!success) return;
+
+        isSubmitting = true;
+
+        Model.ProfessionalId = professionalDto.Id;
+        Model.AvailableDate = _availableDate.GetValueOrDefault(DateTime.MinValue);
+        Model.StartTime = _startTime.GetValueOrDefault(TimeSpan.Zero);
+        Model.EndTime = _endtime.GetValueOrDefault(TimeSpan.Zero);
+        Model.IsBooked = _isBooked;
+
+        // AddEditAvailabilityCommand ModelData = Model;
+
+        var response = IsEditMode
+            ? await ProfessionalService.UpdateTimeSlot(Model)
+            : await ProfessionalService.CreateTimeSlot(Model);
+
+        if (response.IsSuccess)
+        {
+            Snackbar.Add(response.Message, Severity.Success);
+            await OnSubmitSuccess.InvokeAsync(true);
+        }
+        else
+        {
+            Snackbar.Add(response.Message, Severity.Error);
+        }
+
+        isSubmitting = false;
+    }
+}

@@ -1,0 +1,57 @@
+﻿@inherits LayoutComponentBase
+
+<MudThemeProvider Theme="@CustomTheme" IsDarkMode="true" />
+<MudPopoverProvider />
+
+@* Needed for dialogs *@
+<MudDialogProvider />
+
+@* Needed for snackbars *@
+<MudSnackbarProvider />
+<MudLayout>
+    <!-- Top Navigation Bar -->
+    <MudAppBar Elevation="4">
+        <MudIconButton Icon="mdi-menu" OnClick="ToggleDrawer" />
+        <MudSpacer />
+        <MudLink Href="https://learn.microsoft.com/aspnet/core/" Target="_blank">About</MudLink>
+    </MudAppBar>
+
+    <!-- Sidebar Drawer -->
+    <MudDrawer @bind-Open="_drawerOpen" ClipMode="DrawerClipMode.Always" Elevation="8">
+        <NavMenu />
+    </MudDrawer>
+
+    <!-- Main Content Area -->
+    <MudMainContent>
+        <MudContainer MaxWidth="MaxWidth.ExtraExtraLarge">
+            @Body
+        </MudContainer>
+    </MudMainContent>
+</MudLayout>
+
+
+@code {
+    private bool _drawerOpen = true;
+
+    private void ToggleDrawer()
+    {
+        _drawerOpen = !_drawerOpen;
+    }
+
+    private MudTheme CustomTheme = new MudTheme()
+        {
+            PaletteLight = new PaletteLight()
+            {
+                AppbarBackground = new MudBlazor.Utilities.MudColor("#003D59"),
+                Primary = new MudBlazor.Utilities.MudColor("#003D59"),
+                Secondary = new MudBlazor.Utilities.MudColor("#013243"),
+            },
+            PaletteDark = new PaletteDark()
+            {
+                AppbarBackground = new MudBlazor.Utilities.MudColor("#1DACD6"),
+                Primary = new MudBlazor.Utilities.MudColor("#1DACD6"),
+                Secondary = new MudBlazor.Utilities.MudColor("#48D1CC"),
+            }
+        };
+}
+

@@ -1,0 +1,31 @@
+﻿@page "/create-appointment"
+@using AppointmentBookingApp.Application.Appointments.Commands
+@using AppointmentBookingApp.Application.Professionals.Commands
+@using AppointmentBookingApp.Client.Components.Pages.Appointment.Components
+
+@inject NavigationManager NavigationManager
+
+<PageTitle>Appointment</PageTitle>
+
+<AuthorizeView Roles="User">
+    <Authorized>
+        <AppointmentForm Model="new AddEditAppointmentCommand()"
+                         IsEditMode="false"
+                         OnSubmitSuccess="HandleSuccess" />
+    </Authorized>
+    <NotAuthorized>
+        <MudAlert Severity="Severity.Error">
+            You are not authorized to view this page. Only Users can access this page.
+        </MudAlert>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private void HandleSuccess(bool success)
+    {
+        if (success)
+        {
+            NavigationManager.NavigateTo("/appointment-list");
+        }
+    }
+}

@@ -1,0 +1,123 @@
+﻿@using AppointmentBookingApp.Client.Services
+
+@inject ProfessionalService ProfessionalService
+
+<MudDialog>
+    <TitleContent><h4>@DialogTitle</h4></TitleContent>
+    <DialogContent>
+        <MudGrid Spacing="2">
+            @if (TimeSlots.Any())
+            {
+                @foreach (var slot in TimeSlots)
+                {
+                    <MudItem xs="4">
+                        <MudButton Variant="Variant.Filled"
+                                   Color="@(slot.IsReserved ? Color.Error : (SelectedSlotId == slot.Id ? Color.Primary : Color.Default))"
+                                   Disabled="slot.IsReserved"
+                                   OnClick="() => SelectTimeSlot(slot.Id, slot.AppointmentDate, slot.StartTime, slot.EndTime)">
+                            <div>
+                                <b>@slot.AppointmentDate.ToString("MMM dd, yyyy")</b><br />
+                                @slot.StartTime - @slot.EndTime
+                            </div>
+                        </MudButton>
+                    </MudItem>
+                }
+            }
+            else
+            {
+                <p>No available slots.</p>
+            }
+        </MudGrid>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Primary" OnClick="Submit" Disabled="SelectedSlotId == 0">Continue</MudButton>
+        <MudButton OnClick="Cancel">Cancel</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter] public string DialogTitle { get; set; }
+    [Parameter] public int ProfessionalId { get; set; }
+    [Parameter] public EventCallback<string> OnTimeSelected { get; set; }
+
+    private class TimeSlot
+    {
+        public int Id { get; }
+        public DateTime AppointmentDate { get; }
+        public string StartTime { get; }
+        public string EndTime { get; }
+        public bool IsReserved { get; }
+
+        public TimeSlot(int id, DateTime appointmentDate, string startTime, string endTime, bool isReserved)
+        {
+            Id = id;
+            AppointmentDate = appointmentDate;
+            StartTime = startTime;
+            EndTime = endTime;
+            IsReserved = isReserved;
+        }
+    }
+
+    private List<TimeSlot> TimeSlots = new();
+    private int SelectedSlotId;
+    private DateTime SelectedAppointmentDate;
+    private string SelectedStartTime;
+    private string SelectedEndTime;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadTimeSlots();
+    }
+
+    private async Task LoadTimeSlots()
+    {
+        try
+        {
+            var availableSlots = await ProfessionalService.GetAvailableTimeSlotsByProfessionalId(ProfessionalId);
+
+            TimeSlots = availableSlots.Select(slot => new TimeSlot(
+                slot.Id,
+                slot.AvailableDate,
+                ConvertTimeSpanToString(slot.StartTime),
+                ConvertTimeSpanToString(slot.EndTime),
+                slot.IsBooked 
+            )).ToList();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading time slots: {ex.Message}");
+        }
+    }
+
+    private string ConvertTimeSpanToString(TimeSpan timeSpan)
+    {
+        return DateTime.Today.Add(timeSpan).ToString("hh:mm tt"); 
+    }
+
+    private void SelectTimeSlot(int slotId, DateTime appointmentDate, string startTime, string endTime)
+    {
+        SelectedSlotId = slotId;
+        SelectedAppointmentDate = appointmentDate;
+        SelectedStartTime = startTime;
+        SelectedEndTime = endTime;
+    }
+
+    private async Task Submit()
+    {
+        var result = new { SlotId = SelectedSlotId, 
+                           AppointmentDate = SelectedAppointmentDate,
+                           TimeRange = $"{SelectedStartTime} - {SelectedEndTime}"
+                        };
+
+        await OnTimeSelected.InvokeAsync(SelectedSlotId.ToString());
+        MudDialog.Close(DialogResult.Ok(result));
+    }
+
+    private void Cancel() => MudDialog.Cancel();
+
+    
+
+}
